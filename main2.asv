@@ -1,0 +1,104 @@
+%% Clear variables, figures
+clear variables
+clc;
+close all;
+clf
+set(0, 'defaultfigurewindowstyle', 'docked');
+%% Adding path
+addpath(strcat(pwd, '/NonLinDiff1D'));  % PATH to 1D non-linear diffusion solver
+addpath(strcat(pwd, '/swap_pca'));      % PATH to adaptive strategies arXiv:1903.07220
+
+swap_or_seq = 'swap';                   % Special parameter for testing extension_PCA vs. sequential basis extension                  
+
+load IGEMS_1FMMUP1.mat                  % Dataset of prior model realizations
+dataset = 0.01 * dataset;
+
+D = dataset(:, 1);
+Dinit = dataset(:,20);
+dataset(:,20) = [];
+
+L = pi;
+T = 10;
+Nx = length(D)+1;
+NxD = Nx-1;
+Nt = 51;
+x = linspace(0.1, L+0.1, Nx)';
+xD = linspace(0.1, L+0.1, NxD)';
+
+uinit = 2*ones(Nx, 1) + cos(0.03*(1:Nx))'; 
+uL = 0.01;
+uR = -0.02;
+%%
+par = PCA_par(dataset, 'svd', 0.7);
+%% Covariance matrix and its eigenvalues of dataset
+%
+figure('Name', 'Covariance matrix and its eigenvalues')
+subplot(2,1,1)
+imagesc(par.eigvector_full);
+colorbar;
+subplot(2,1,2);
+semilogy(abs(diag(par.sigma_full)));
+drawnow limitrate
+%}
+%%
+
+eps = 1e-8;
+Kmin = 4;
+Kmax = 12;
+ml = 1.0;
+
+maxNewton = 100;
+
+solver_params = struct( ...
+    'L', L, ...
+    'T', T, ...
+    'Nx', Nx, ...
+    'NxD', NxD, ...
+    'Nt', Nt, ...
+    'uinit', uinit, ...
+    'uL', uL, ...
+    'uR', uR, ...
+    'D', D, ...
+    'eps', eps, ...
+    'Kmin', Kmin, ...
+    'Kmax', Kmax, ...
+    'multiplier', ml, ...
+    'maxNewton', maxNewton ...
+    );
+%%
+fprintf('Building u dustribution...');
+[u_true, timesteps3] = solve(solver_params, D);
+disp('done');
+fprintf('--q----\n');
+%%
+figure('Name', 'Solution of non-linear diffusion problem');
+hold on;
+for i = 1:Nt
+    plot(u_true(:,i), 'linewidth', 1 + (i==1));
+end
+drawnow limitrate;
+%%
+
+max_iter = 100;
+eps = 1e-6;
+useplot = false;
+
+%% No parametrization | CG
+
+[a_no_cg, b_no_cg, ~] = optimize_qN(solver_params, u_true, Dinit, max_iter, eps, par, 'No', useplot, false, false);
+fprintf('NO is done\n')
+fprintf('-----------------\n')
+[a_pca_cg, b_pca_cg, ~] = optimize_qN(solver_params, u_true, Dinit, max_iter, eps, par, 'PCA', useplot, false, false);
+fprintf('PCA is done\n')
+fprintf('-----------------\n')
+[a_rot_cg, b_rot_cg, ex_rot_cg] = optimize_qN(solver_params, u_true, Dinit, max_iter, eps, par, 'PCA', useplot, 5, 'rotation');
+fprintf('ROTATION is done\n')
+fprintf('-----------------\n')
+[a_swap_cg, b_swap_cg, ex_swap_cg] = optimize_qN(solver_params, u_true, Dinit, max_iter, eps, par, 'PCA', useplot, 5, 'swap');
+fprintf('SWAP is done\n')
+fprintf('-----------------\n')
+[a_ext_cg, b_ext_cg, ex_ext_cg] = optimize_qN(solver_params, u_true, Dinit, max_iter, eps, par, 'PCA', useplot, 5, 'extend');
+fprintf('EXT is done\n')
+fprintf('-----------------\n')
+
+results;
