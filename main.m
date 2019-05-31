@@ -14,7 +14,7 @@ load IGEMS_1FMMUP1.mat                  % Dataset of prior model realizations
 dataset = 0.01 * dataset;
 
 D = dataset(:, 1);                      % Choosing real model
-Dinit = dataset(:,20);                  % Choosing initial model
+Dinit = dataset(:,6);                  % Choosing initial model
 dataset(:,1) = [];                      % Deleting real model from dataset
 
 L = pi;                                 % Spatial size of 1D problem
